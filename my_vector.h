@@ -1,14 +1,13 @@
 #include <initializer_list>
 #include <memory>
 
-template <typename T,
-        class Allocator = std::allocator<T>
-> class my_vector {
-private:
+template <typename T>
 
-public:
+class my_vector {
+ private:
+
+ public:
     typedef T value_type;
-    typedef Allocator allocator_type;
     typedef std::size_t size_type;
     typedef value_type& reference;
     typedef const value_type& const_reference;
