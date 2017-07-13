@@ -34,6 +34,7 @@ private:
     Node * root = nullptr;
     Node * tree_end = nullptr;
     Node * max = nullptr;
+    Node * min = nullptr;
     size_type tree_size = 0;
 
     size_type Cnt(Node * tree) {
@@ -137,6 +138,7 @@ private:
 
     void Update() {
         max = GetByIndex(tree_size - 1);
+        min = GetByIndex(0);
     }
 
     void Clear(Node* cur) {
@@ -267,6 +269,8 @@ public:
         }
 
         iterator& operator++() {
+            if (ptr == tree->tree_end)
+                return *this;
             if (ptr == tree->max) {
                 ptr = tree->tree_end;
                 return *this;
@@ -293,6 +297,8 @@ public:
         }
 
         iterator& operator--() {
+            if (ptr == tree->min)
+                return *this;
             if (ptr == tree->tree_end) {
                 ptr = tree->max;
                 return *this;
@@ -318,8 +324,21 @@ public:
             return old;
         }
 
-        const T* operator -> () {
-            return &(ptr->key);
+        iterator& operator+=(int n) {
+            if (n >= 0)
+                while(n--) ++(*this);
+            else
+                while(n++) --(*this);
+            return *this;
+        }
+
+        iterator operator+(int n) {
+            auto temp = this;
+            return *(temp += n);
+        }
+
+        iterator& operator-=(int n) {
+            return (*this += -n);
         }
 
         friend bool operator == (iterator l, iterator r) {
@@ -329,6 +348,48 @@ public:
         friend bool operator != (iterator l, iterator r) {
             return !(l == r);
         }
+        int operator-(iterator z) {
+            iterator tmp_for = iterator(ptr, tree);
+            iterator tmp_rev = iterator(ptr, tree);
+            int cnt_for = 0;
+            int cnt_rev = 0;
+            while (tmp_for != z && tmp_rev != z) {
+                cnt_rev++;
+                tmp_rev--;
+                cnt_for--;
+                tmp_for++;
+            }
+            if (tmp_for == z)
+                return cnt_for;
+            return cnt_rev;
+        }
+
+        reference operator[](int n) {
+            iterator q = iterator(ptr, tree);
+            q += n;
+            return (q.ptr->key);
+        }
+
+        const T* operator -> () {
+            return &(ptr->key);
+        }
+
+        bool operator < (iterator b) {
+            return *this - b > 0;
+        }
+
+        bool operator > (iterator b) {
+            return b < *this;
+        }
+
+        bool operator >= (iterator b) {
+            return !(*this < b);
+        }
+
+        bool operator <= (iterator b) {
+            return !(*this > b);
+        }
+
     };
 
     class const_iterator : public  std::iterator<std::random_access_iterator_tag, T> {
@@ -372,17 +433,13 @@ public:
         return tree_size;
     }
 
-    size_type max_size() const noexcept {
-        return tree_size;
-    }
+    size_type max_size() const noexcept;
 
-    void reserve(size_type new_cap) {}
+    void reserve(size_type new_cap);
 
-    size_type capacity() const noexcept {
-        return tree_size;
-    }
+    size_type capacity() const noexcept;
 
-    void shrink_to_fit() {}
+    void shrink_to_fit();
 
     // Modifiers
 
