@@ -5,7 +5,6 @@
 #include <limits>
 #include <iostream>
 #include <stdexcept>
-
 template <typename T>
 class my_vector {
 private:
@@ -36,6 +35,24 @@ private:
     Node * max = nullptr;
     Node * min = nullptr;
     size_type tree_size = 0;
+
+    Node * TreeMinimum(Node * x) {
+        if (x == nullptr)
+            return x;
+        while (x->left != nullptr) {
+            x = x->left;
+        }
+        return x;
+    }
+
+    Node * TreeMaximum(Node * x) {
+        if (x == nullptr)
+            return x;
+        while (x->right != nullptr) {
+            x = x->right;
+        }
+        return x;
+    }
 
     size_type Cnt(Node * tree) {
         return tree ? tree-> cnt : 0;
@@ -123,7 +140,7 @@ private:
         DeleteNode(tmp3);
     }
 
-    Node* NewNode(const T & value) {
+    Node* NewNode(const T& value) {
         Node* t = new Node(value);
         ++tree_size;
         return t;
@@ -137,8 +154,8 @@ private:
     }
 
     void Update() {
-        max = GetByIndex(tree_size - 1);
-        min = GetByIndex(0);
+        max = TreeMaximum(root);
+        min = TreeMinimum(root);
     }
 
     void Clear(Node* cur) {
@@ -149,7 +166,8 @@ private:
         }
     }
 
-    size_type GetIndex(Node* z) {
+    size_type GetIndex(Node* u) {
+        Node* z = u;
         Node* tmp = z;
         size_type index = Cnt(z->left);
         z = z->p;
@@ -163,6 +181,8 @@ private:
     }
 
     Node* GetByIndex(size_type t) {
+        if (tree_size == 0)
+            return tree_end;
         Node* cur = root;
         while (t != Cnt(cur->left)) {
             if (t < Cnt(cur->left))
@@ -175,7 +195,9 @@ private:
         return cur;
     }
 
-    const Node* GetByIndex(size_type t) const {
+    Node* GetByIndex(size_type t) const {
+        if (t >= tree_size)
+            return tree_end;
         Node* cur = root;
         while (t != Cnt(cur->left)) {
             if (t < Cnt(cur->left))
@@ -193,17 +215,75 @@ public:
 
     my_vector(){}
 
+    my_vector(size_type count, const T& value) {
+        while (count) {
+            count--;
+            push_back(value);
+        }
+    }
+
+    my_vector(size_type count) {
+        while (count) {
+            count--;
+            push_back(T());
+        }
+    }
+
+    my_vector(const my_vector<T>& other) {
+        for (auto i : other) {
+            push_back(std::move(i));
+        }
+    }
+
+    my_vector(my_vector<T>&& other) {
+        for (auto i : other) {
+            push_back(std::move(i));
+        }
+    }
+
+    template<typename InputIt>
+    my_vector(InputIt first, InputIt last) {
+        for (; first != last; ++first) {
+            push_back(*first);
+        }
+    }
+
+    my_vector(std::initializer_list<T> init) : my_vector(init.begin(), init.end()) {}
+
     ~ my_vector(){
         Clear(root);
     }
 
-    my_vector& operator=(my_vector&& other);
+    my_vector& operator=(const my_vector& other) {
+        my_vector<T> temp(std::move(other));
+        temp.swap(*this);
+        return *this;
+    }
 
-    my_vector& operator=(std::initializer_list<T> ilist);
+    my_vector& operator=(std::initializer_list<T> ilist) {
+        my_vector<T> temp(ilist);
+        *this = temp;
+        return *this;
+    }
 
-    void assign(size_type count, const T& value);
+    void assign(size_type count, const T& value) {
+        clear();
+        while (count) {
+            push_back(value);
+        }
+    }
 
-    void assign(std::initializer_list<T> ilist);
+    template< typename InputIt>
+    void assign(InputIt first, InputIt last) {
+        clear();
+        for (; first != last; ++first) {
+            push_back(*first);
+        }
+    }
+
+    void assign(std::initializer_list<T> ilist) {
+        assign(ilist.begin(), ilist.end());
+    }
 
     // Element access
 
@@ -230,11 +310,11 @@ public:
     }
 
     reference front() {
-        return GetByIndex(0)->key;
+        return min->key;
     }
 
     const_reference front() const {
-        return GetByIndex(0)->key;
+        return min->key;
     }
 
     reference back() {
@@ -255,20 +335,19 @@ public:
 
     // Iterators
 
-    class iterator : public  std::iterator<std::random_access_iterator_tag, T> {
-    private:
+    class const_iterator {
+    protected:
         Node * ptr;
         const my_vector * tree;
-
     public:
-        iterator() {}
-        iterator(Node * p, const my_vector* tree_) : ptr(p), tree(tree_) {}
+        const_iterator() {}
+        const_iterator(Node * p, const my_vector* tree_) : ptr(p), tree(tree_) {}
 
-        const T& operator * () {
-            return (ptr->key);
+        const T& operator * () const {
+            return ptr->key;
         }
 
-        iterator& operator++() {
+        const_iterator& operator++() {
             if (ptr == tree->tree_end)
                 return *this;
             if (ptr == tree->max) {
@@ -290,13 +369,13 @@ public:
             return *this;
         }
 
-        iterator operator++(int) {
+        const_iterator operator++(int) {
             auto old = *this;
             ++(*this);
             return old;
         }
 
-        iterator& operator--() {
+        const_iterator& operator--() {
             if (ptr == tree->min)
                 return *this;
             if (ptr == tree->tree_end) {
@@ -318,13 +397,13 @@ public:
             return *this;
         }
 
-        iterator operator--(int) {
+        const_iterator operator--(int) {
             auto old = *this;
             --(*this);
             return old;
         }
 
-        iterator& operator+=(int n) {
+        const_iterator& operator+=(int n) {
             if (n >= 0)
                 while(n--) ++(*this);
             else
@@ -332,25 +411,25 @@ public:
             return *this;
         }
 
-        iterator operator+(int n) {
+        const_iterator operator+(int n) {
             auto temp = this;
             return *(temp += n);
         }
 
-        iterator& operator-=(int n) {
+        const_iterator& operator-=(int n) {
             return (*this += -n);
         }
 
-        friend bool operator == (iterator l, iterator r) {
+        friend bool operator == (const_iterator l, const_iterator r) {
             return l.ptr == r.ptr;
         }
 
-        friend bool operator != (iterator l, iterator r) {
+        friend bool operator != (const_iterator l, const_iterator r) {
             return !(l == r);
         }
-        int operator-(iterator z) {
-            iterator tmp_for = iterator(ptr, tree);
-            iterator tmp_rev = iterator(ptr, tree);
+        int operator-(const_iterator z) {
+            const_iterator tmp_for = const_iterator(ptr, tree);
+            const_iterator tmp_rev = const_iterator(ptr, tree);
             int cnt_for = 0;
             int cnt_rev = 0;
             while (tmp_for != z && tmp_rev != z) {
@@ -365,7 +444,7 @@ public:
         }
 
         reference operator[](int n) {
-            iterator q = iterator(ptr, tree);
+            const_iterator q = const_iterator(ptr, tree);
             q += n;
             return (q.ptr->key);
         }
@@ -374,54 +453,58 @@ public:
             return &(ptr->key);
         }
 
-        bool operator < (iterator b) {
+        bool operator < (const_iterator b) {
             return *this - b > 0;
         }
 
-        bool operator > (iterator b) {
+        bool operator > (const_iterator b) {
             return b < *this;
         }
 
-        bool operator >= (iterator b) {
+        bool operator >= (const_iterator b) {
             return !(*this < b);
         }
 
-        bool operator <= (iterator b) {
+        bool operator <= (const_iterator b) {
             return !(*this > b);
         }
 
     };
 
-    class const_iterator : public  std::iterator<std::random_access_iterator_tag, T> {
+    class iterator : public const_iterator {
+    public:
+        iterator() : const_iterator() {}
+        iterator(Node * p, const my_vector * tree_) : const_iterator(p, tree_) {}
+
+        const T& operator * () {
+            return this->ptr->key;
+        }
+
     };
 
     iterator begin() noexcept {
-        return iterator(GetByIndex(0), this);
+        return iterator(min, this);
     }
 
-    const_iterator begin() const noexcept;
+    const_iterator begin() const noexcept {
+        return const_iterator(min, this);
+    }
 
-    const_iterator cbegin() const noexcept;
+    const_iterator cbegin() const noexcept {
+        return const_iterator(min, this);
+    }
 
     iterator end() noexcept {
         return iterator(tree_end, this);
     }
 
-    const_iterator end() const noexcept;
+    const_iterator end() const noexcept {
+        return const_iterator(tree_end, this);
+    }
 
-    const_iterator cend() const noexcept;
-
-    iterator rbegin() noexcept;
-
-    const_iterator rbegin() const noexcept;
-
-    const_iterator crbegin() const noexcept;
-
-    iterator rend() noexcept;
-
-    const_iterator rend() const noexcept;
-
-    const_iterator crend() const noexcept;
+    const_iterator cend() const noexcept {
+        return const_iterator(tree_end, this);
+    }
 
     // Capacity
 
@@ -433,46 +516,80 @@ public:
         return tree_size;
     }
 
-    size_type max_size() const noexcept;
-
-    void reserve(size_type new_cap);
-
-    size_type capacity() const noexcept;
-
-    void shrink_to_fit();
-
     // Modifiers
 
     void clear() noexcept {
         Clear(root);
+        root = nullptr;
+        Update();
     }
 
-    iterator insert(const_iterator pos, const T& value);
+    iterator insert(const_iterator pos, const T& value) {
+        auto t = pos - cbegin();
+        Insert(t, NewNode(value));
+        Update();
+        return iterator(GetByIndex(t), this);
+    }
 
-    iterator insert(const_iterator pos, T&& value);
+    iterator insert(const_iterator pos, T&& value) {
+        auto t = pos - cbegin();
+        Insert(t, NewNode(value));
+        Update();
+        return iterator(GetByIndex(t), this);
+    }
 
-    iterator insert(const_iterator pos, size_type count, const T& value);
+    iterator insert(const_iterator pos, size_type count, const T& value) {
+        auto t = pos - cbegin();
+        while (count) {
+            insert(pos, value);
+            count--;
+        }
+        return iterator(GetByIndex(t), this);
+    }
 
-    template <class InputIt>
-    iterator insert(const_iterator pos, InputIt first, InputIt last);
+    template <typename InputIt>
+    iterator insert(const_iterator pos, InputIt first, InputIt last) {
+        auto t = pos - cbegin();
+        while (first != last) {
+            insert(pos, *first);
+            first++;
+        }
+        return iterator(GetByIndex(t), this);
+    }
 
-    iterator insert(const_iterator pos, std::initializer_list<T> ilist);
+    iterator insert(const_iterator pos, std::initializer_list<T> ilist) {
+        auto t = pos - cbegin();
+        for (auto i : ilist) {
+            insert(pos, i);
+        }
+        return iterator(GetByIndex(t), this);
+    }
 
     template <class... Args>
-    iterator emplace(const_iterator pos, Args&&... args);
-
-    iterator erase(const_iterator pos);
-
-    iterator erase(const_iterator first, const_iterator last);
-
-    void insert (size_type ind, T value) {
-        Insert(ind, NewNode(value));
-        Update();
+    iterator emplace(const_iterator pos, Args&&... args) {
+        T temp = T(args...);
+        return insert(pos, temp);
     }
 
-    void erase(size_type ind) {
-        Erase(ind);
+    iterator erase(const_iterator pos) {
+        auto t = pos - cbegin();
+        Erase(t);
         Update();
+        if (t < size())
+            return iterator(GetByIndex(t), this);
+        return iterator(tree_end, this);
+    }
+
+    iterator erase(const_iterator first, const_iterator last) {
+        auto t = first - cbegin();
+        auto cnt = last - first;
+        while (cnt) {
+            cnt--;
+            erase(iterator(GetByIndex(t), this));
+        }
+        if (t < size())
+            return iterator(GetByIndex(t), this);
+        return iterator(tree_end, this);
     }
 
     void push_back (T&& value) {
@@ -485,20 +602,51 @@ public:
         Update();
     }
 
+    void push_back (const T& value) {
+        auto tmp = NewNode(value);
+        if (root == nullptr) {
+            root = tmp;
+        } else {
+            Insert(root->cnt, tmp);
+        }
+        Update();
+    }
+
     template <class... Args>
-    reference emplace_back(Args&&... args);
+    void emplace_back(Args&&... args) {
+        push_back(T(args...));
+    }
+    void pop_back() {
+        Erase(size() - 1);
+        Update();
+    }
 
-    void pop_back();
+    void swap(my_vector<T>& other)  {
+        my_vector<T> c;
+        for (auto i : other) {
+            c.push_back(std::move(i));
+        }
+        other.clear();
+        for (auto i : (*this)) {
+            other.push_back(std::move(i));
+        }
+        clear();
+        for (auto i : c) {
+            (*this).push_back(std::move(i));
+        }
+    }
 
-    void resize(size_type count);
+    void resize(size_type count, const value_type& value) {
+        while (tree_size > count) {
+            pop_back();
+        }
+        while (count > tree_size) {
+            push_back(value);
+        }
+    }
 
-    void resize(size_type count, const value_type& value);
-
-    void swap(my_vector& other) noexcept;
-
-    void print() {
-        Print(root);
-        std::cout << "\n";
+    void resize(size_type count) {
+        resize(count, T());
     }
 };
 
@@ -506,28 +654,62 @@ public:
 
 template<class T>
 bool operator==(const my_vector<T>& lhs,
-                const my_vector<T>& rhs);
+                const my_vector<T>& rhs) {
+    if (lhs.size() == rhs.size()) {
+        for (std::size_t i = 0; i < lhs.size(); ++i) {
+            if (lhs[i] != rhs[i])
+                return false;
+        }
+        return true;
+    }
+    return false;
+}
 
 template<class T>
 bool operator!=(const my_vector<T>& lhs,
-                const my_vector<T>& rhs);
+                const my_vector<T>& rhs) {
+    return !(lhs == rhs);
+}
 
 template<class T>
 bool operator<(const my_vector<T>& lhs,
-               const my_vector<T>& rhs);
+               const my_vector<T>& rhs) {
+    std::size_t i = 0;
+    for (; i < lhs.size() && i < rhs.size(); ++i) {
+        if (lhs[i] < rhs[i])
+            return true;
+        if (rhs[i] < lhs[i])
+            return false;
+    }
+    if (lhs.size() >= rhs.size())
+        return false;
+    return true;
+}
 
 template<class T>
 bool operator<=(const my_vector<T>& lhs,
-                const my_vector<T>& rhs);
+                const my_vector<T>& rhs) {
+    if (lhs < rhs || lhs == rhs)
+        return true;
+}
 
 template<class T>
 bool operator>(const my_vector<T>& lhs,
-               const my_vector<T>& rhs);
-
+               const my_vector<T>& rhs) {
+    if (rhs < lhs)
+        return true;
+    return false;
+}
 template<class T>
 bool operator>=(const my_vector<T>& lhs,
-                const my_vector<T>& rhs);
+                const my_vector<T>& rhs) {
+    if (rhs < lhs || rhs == lhs)
+        return true;
+    return false;
+}
 
 template<class T>
 void swap(my_vector<T>& lhs,
-          my_vector<T>& rhs);
+          my_vector<T>& rhs) {
+    lhs.swap(rhs);
+}
