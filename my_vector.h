@@ -5,6 +5,9 @@
 #include <limits>
 #include <iostream>
 #include <stdexcept>
+#include <time.h>
+
+
 template <typename T>
 class my_vector {
 private:
@@ -12,13 +15,15 @@ private:
     using size_type = std::size_t;
     using reference = value_type&;
     using const_reference =  const value_type&;
-
+    using difference_type = long;
     static size_type Random(size_type lower, size_type upper) {
         static std::random_device randomDevice;
         static std::mt19937 randomGenerator(randomDevice());
         std::uniform_int_distribution<> randomDistribution(lower, upper);
         return randomDistribution(randomGenerator);
     }
+
+    static const size_type MAX_SIZE = 1e9 + 7;
 
     struct Node {
         Node* p;
@@ -27,29 +32,18 @@ private:
         T key;
         const size_type prior;
         size_type cnt = 1;
-        Node (const T& key_) : p(nullptr), left(nullptr), right(nullptr), key(key_), prior(Random(0, 10000007)) {}
+        Node (const T& key_) : p(nullptr), left(nullptr), right(nullptr), key(key_), prior(Random(0, MAX_SIZE)) {}
     };
 
     Node * root = nullptr;
     Node * tree_end = nullptr;
-    Node * max = nullptr;
-    Node * min = nullptr;
     size_type tree_size = 0;
 
-    Node * TreeMinimum(Node * x) {
-        if (x == nullptr)
-            return x;
+    Node * TreeMinimum(Node * x) const {
+        if (tree_size == 0)
+            return tree_end;
         while (x->left != nullptr) {
             x = x->left;
-        }
-        return x;
-    }
-
-    Node * TreeMaximum(Node * x) {
-        if (x == nullptr)
-            return x;
-        while (x->right != nullptr) {
-            x = x->right;
         }
         return x;
     }
@@ -62,21 +56,18 @@ private:
         return tree ? tree-> cnt : 0;
     }
 
-    void Push(Node * tree) {
-        if (tree) {
-        }
-    }
-
     void Update(Node * tree) {
         if (tree) {
             tree->cnt = Cnt(tree->left) + Cnt(tree->right) + 1;
+            tree->p = nullptr;
+            if (tree->left)
+                tree->left->p = tree;
+            if (tree->right)
+                tree->right->p = tree;
         }
     }
 
     void Merge(Node* left, Node* right, Node* &t) {
-        Push(left);
-        Push(right);
-
         if (!left || !right) {
             t = !left ? right : left;
         } else if (left->prior > right->prior) {
@@ -86,15 +77,10 @@ private:
             Merge(left, right->left, right->left);
             t = right;
         }
-        if (t->left)
-            t->left->p = t;
-        if (t->right)
-            t->right->p = t;
         Update(t);
     }
 
     void Split(Node *t, Node *&left, Node *& right, size_type key) {
-        Push(t);
         if (!t) {
             left = nullptr;
             right = nullptr;
@@ -105,17 +91,12 @@ private:
             Split(t->right, t->right, right, key - Cnt(t->left) - 1);
             left = t;
         }
-        if (right != nullptr)
-            right->p = nullptr;
-        if (left != nullptr)
-            left->p = nullptr;
         Update(left);
         Update(right);
     }
 
     void Print(Node* tree) {
         if (tree) {
-            Push(tree);
             Print(tree->left);
             std::cout << tree->key << " ";
             Print(tree->right);
@@ -153,11 +134,6 @@ private:
         delete q;
     }
 
-    void Update() {
-        max = TreeMaximum(root);
-        min = TreeMinimum(root);
-    }
-
     void Clear(Node* cur) {
         if (cur != nullptr) {
             Clear(cur->left);
@@ -166,7 +142,10 @@ private:
         }
     }
 
-    size_type GetIndex(Node* u) {
+    size_type GetIndex(Node* u) const {
+        if (u == tree_end) {
+            return tree_size;
+        }
         Node* z = u;
         Node* tmp = z;
         size_type index = Cnt(z->left);
@@ -181,7 +160,10 @@ private:
     }
 
     Node* GetByIndex(size_type t) {
-        if (tree_size == 0)
+        if (t == 0 && tree_size == 0) {
+            return root;
+        }
+        if (t == tree_size)
             return tree_end;
         Node* cur = root;
         while (t != Cnt(cur->left)) {
@@ -196,7 +178,10 @@ private:
     }
 
     Node* GetByIndex(size_type t) const {
-        if (t >= tree_size)
+        if (t == 0 && tree_size == 0) {
+            return root;
+        }
+        if (t == tree_size)
             return tree_end;
         Node* cur = root;
         while (t != Cnt(cur->left)) {
@@ -310,11 +295,11 @@ public:
     }
 
     reference front() {
-        return min->key;
+        return TreeMinimum(root)->key;
     }
 
     const_reference front() const {
-        return min->key;
+        return TreeMinimum(root)->key;
     }
 
     reference back() {
@@ -335,7 +320,7 @@ public:
 
     // Iterators
 
-    class const_iterator {
+    class const_iterator : public std::iterator<std::random_access_iterator_tag, T> {
     protected:
         Node * ptr;
         const my_vector * tree;
@@ -343,17 +328,26 @@ public:
         const_iterator() {}
         const_iterator(Node * p, const my_vector* tree_) : ptr(p), tree(tree_) {}
 
-        const T& operator * () const {
+        Node* node() {
+            return ptr;
+        }
+
+        const_iterator& operator=(const const_iterator& other) {
+            ptr = other.ptr;
+            return *this;
+        }
+
+        const T& operator*() const {
             return ptr->key;
+        }
+
+        T* operator -> () const  {
+            return &(ptr->key);
         }
 
         const_iterator& operator++() {
             if (ptr == tree->tree_end)
                 return *this;
-            if (ptr == tree->max) {
-                ptr = tree->tree_end;
-                return *this;
-            }
             if (ptr->right != nullptr) {
                 ptr = ptr->right;
                 while (ptr->left != nullptr) {
@@ -365,6 +359,8 @@ public:
                 }
                 if (ptr->p != nullptr)
                     ptr = ptr->p;
+                else
+                    ptr = tree->tree_end;
             }
             return *this;
         }
@@ -376,10 +372,11 @@ public:
         }
 
         const_iterator& operator--() {
-            if (ptr == tree->min)
-                return *this;
             if (ptr == tree->tree_end) {
-                ptr = tree->max;
+                ptr = tree->root;
+                while (ptr->right != nullptr) {
+                    ptr = ptr->right;
+                }
                 return *this;
             }
             if (ptr->left != nullptr) {
@@ -388,7 +385,7 @@ public:
                     ptr = ptr->right;
                 }
             } else {
-                while (ptr->p->left == ptr) {
+                while (ptr->p != nullptr && ptr->p->left == ptr) {
                     ptr = ptr->p;
                 }
                 if (ptr->p != nullptr)
@@ -403,20 +400,36 @@ public:
             return old;
         }
 
-        const_iterator& operator+=(int n) {
-            if (n >= 0)
-                while(n--) ++(*this);
-            else
-                while(n++) --(*this);
+        const_reference operator[](difference_type n) const {
+            const_iterator q = const_iterator(ptr, tree);
+            q += n;
+            return (q.ptr->key);
+        }
+
+        reference operator[](difference_type n) {
+            const_iterator q = const_iterator(ptr, tree);
+            q += n;
+            return (q.ptr->key);
+        }
+
+        const_iterator& operator+=(difference_type n) {
+            difference_type temp;
+            temp = tree->GetIndex(ptr) + n;
+            ptr = tree->GetByIndex(temp);
             return *this;
         }
 
-        const_iterator operator+(int n) {
-            auto temp = this;
-            return *(temp += n);
+        const_iterator operator+(difference_type n) {
+            auto temp = *this;
+            return temp += n;
         }
 
-        const_iterator& operator-=(int n) {
+        const_iterator operator-(difference_type n) {
+            const_iterator temp = *this;
+            return temp -= n;
+        }
+
+        const_iterator& operator-=(difference_type n) {
             return (*this += -n);
         }
 
@@ -427,30 +440,12 @@ public:
         friend bool operator != (const_iterator l, const_iterator r) {
             return !(l == r);
         }
-        int operator-(const_iterator z) {
-            const_iterator tmp_for = const_iterator(ptr, tree);
-            const_iterator tmp_rev = const_iterator(ptr, tree);
-            int cnt_for = 0;
-            int cnt_rev = 0;
-            while (tmp_for != z && tmp_rev != z) {
-                cnt_rev++;
-                tmp_rev--;
-                cnt_for--;
-                tmp_for++;
-            }
-            if (tmp_for == z)
-                return cnt_for;
-            return cnt_rev;
-        }
 
-        reference operator[](int n) {
-            const_iterator q = const_iterator(ptr, tree);
-            q += n;
-            return (q.ptr->key);
-        }
-
-        const T* operator -> () {
-            return &(ptr->key);
+        difference_type operator-(const_iterator z) {
+            difference_type first = tree->GetIndex(z.ptr);
+            difference_type second = tree->GetIndex(ptr);
+            difference_type result = second - first;
+            return result;
         }
 
         bool operator < (const_iterator b) {
@@ -469,6 +464,10 @@ public:
             return !(*this > b);
         }
 
+        friend const_iterator operator+(difference_type n, const const_iterator& it) {
+            const_iterator temp = it;
+            return temp += n;
+        }
     };
 
     class iterator : public const_iterator {
@@ -476,43 +475,175 @@ public:
         iterator() : const_iterator() {}
         iterator(Node * p, const my_vector * tree_) : const_iterator(p, tree_) {}
 
-        const T& operator * () {
+        iterator& operator=(const iterator& other) {
+            this->ptr = other.ptr;
+            return *this;
+        }
+
+        T& operator * () {
             return this->ptr->key;
         }
 
+        T* operator -> () const  {
+            return &(this->ptr->key);
+        }
+
+        iterator& operator++() {
+            if (this->ptr->right != nullptr) {
+                this->ptr = this->ptr->right;
+                while (this->ptr->left != nullptr) {
+                    this->ptr = this->ptr->left;
+                }
+            } else {
+                while (this->ptr->p != nullptr && this->ptr->p->right == this->ptr) {
+                    this->ptr = this->ptr->p;
+                }
+                if (this->ptr->p != nullptr)
+                    this->ptr = this->ptr->p;
+                else
+                    this->ptr = this->tree->tree_end;
+            }
+            return *this;
+        }
+
+        iterator operator++(int) {
+            iterator old = *this;
+            ++(*this);
+            return old;
+        }
+
+        iterator& operator--() {
+            if (this->ptr == this->tree->tree_end) {
+                this->ptr = this->tree->root;
+                while (this->ptr->right != nullptr) {
+                    this->ptr = this->ptr->right;
+                }
+                return *this;
+            }
+            if (this->ptr->left != nullptr) {
+                this->ptr = this->ptr->left;
+                while (this->ptr->right != nullptr) {
+                    this->ptr = this->ptr->right;
+                }
+            } else {
+                while (this->ptr->p != nullptr && this->ptr->p->left == this->ptr) {
+                    this->ptr = this->ptr->p;
+                }
+                if (this->ptr->p != nullptr)
+                    this->ptr = this->ptr->p;
+            }
+            return *this;
+        }
+
+        iterator operator--(int) {
+            iterator old = *this;
+            --(*this);
+            return old;
+        }
+
+        const_reference operator[](difference_type n) const {
+            iterator q = iterator(this->ptr, this->tree);
+            q += n;
+            return (q.ptr->key);
+        }
+
+        reference operator[](difference_type n) {
+            iterator q = iterator(this->ptr, this->tree);
+            q += n;
+            return (q.ptr->key);
+        }
+
+        iterator& operator+=(difference_type n) {
+            //std::cout << "fuck123 " << this->tree->GetIndex(this->ptr) << "\n";
+            difference_type temp;
+            temp = this->tree->GetIndex(this->ptr) + n;
+            this->ptr = this->tree->GetByIndex(temp);
+            return *this;
+        }
+
+        iterator operator+(difference_type n) {
+            iterator temp = *this;
+            return temp += n;
+        }
+
+        iterator operator-(difference_type n) {
+            iterator temp = *this;
+            return temp -= n;
+        }
+
+        iterator& operator-=(difference_type n) {
+            return (*this += -n);
+        }
+
+        friend bool operator == (iterator l, iterator r) {
+            return l.ptr == r.ptr;
+        }
+
+        friend bool operator != (iterator l, iterator r) {
+            return !(l == r);
+        }
+
+        difference_type operator-(const iterator z) const {
+            difference_type first = this->tree->GetIndex(z.ptr);
+            difference_type second = this->tree->GetIndex(this->ptr);
+            difference_type result = second - first;
+            return result;
+        }
+
+        bool operator < (iterator b) {
+            return (*this - b) > 0;
+        }
+
+        bool operator > (iterator b) {
+            return b < *this;
+        }
+
+        bool operator >= (iterator b) {
+            return !(*this < b);
+        }
+
+        bool operator <= (iterator b) {
+            return !(*this > b);
+        }
+
+        friend iterator operator+(int n, const iterator& it) {
+            iterator temp = it;
+            return temp += n;
+        }
     };
 
-    iterator begin() noexcept {
-        return iterator(min, this);
+
+    iterator begin() {
+        return iterator(TreeMinimum(root), this);
     }
 
-    const_iterator begin() const noexcept {
-        return const_iterator(min, this);
+    const_iterator begin() const{
+        return const_iterator(TreeMinimum(root), this);
     }
 
-    const_iterator cbegin() const noexcept {
-        return const_iterator(min, this);
+    const_iterator cbegin() const{
+        return const_iterator(TreeMinimum(root), this);
     }
 
-    iterator end() noexcept {
+    iterator end() {
         return iterator(tree_end, this);
     }
 
-    const_iterator end() const noexcept {
+    const_iterator end() const{
         return const_iterator(tree_end, this);
     }
 
-    const_iterator cend() const noexcept {
+    const_iterator cend() const {
         return const_iterator(tree_end, this);
     }
 
     // Capacity
 
-    bool empty() const noexcept {
+    bool empty() const {
         return tree_size == 0;
     }
 
-    size_type size() const noexcept {
+    size_type size() const {
         return tree_size;
     }
 
@@ -521,21 +652,18 @@ public:
     void clear() noexcept {
         Clear(root);
         root = nullptr;
-        Update();
     }
 
     iterator insert(const_iterator pos, const T& value) {
-        auto t = pos - cbegin();
-        Insert(t, NewNode(value));
-        Update();
-        return iterator(GetByIndex(t), this);
+        size_type temp = GetIndex(pos.node());
+        Insert(temp, NewNode(value));
+        return iterator(GetByIndex(temp), this);
     }
 
     iterator insert(const_iterator pos, T&& value) {
-        auto t = pos - cbegin();
-        Insert(t, NewNode(value));
-        Update();
-        return iterator(GetByIndex(t), this);
+        size_type temp = GetIndex(pos.node());
+        Insert(temp, NewNode(value));
+        return iterator(GetByIndex(temp), this);
     }
 
     iterator insert(const_iterator pos, size_type count, const T& value) {
@@ -574,10 +702,7 @@ public:
     iterator erase(const_iterator pos) {
         auto t = pos - cbegin();
         Erase(t);
-        Update();
-        if (t < size())
-            return iterator(GetByIndex(t), this);
-        return iterator(tree_end, this);
+        return iterator(GetByIndex(t), this);
     }
 
     iterator erase(const_iterator first, const_iterator last) {
@@ -599,7 +724,6 @@ public:
         } else {
             Insert(root->cnt, tmp);
         }
-        Update();
     }
 
     void push_back (const T& value) {
@@ -609,16 +733,15 @@ public:
         } else {
             Insert(root->cnt, tmp);
         }
-        Update();
     }
 
     template <class... Args>
     void emplace_back(Args&&... args) {
         push_back(T(args...));
     }
+
     void pop_back() {
         Erase(size() - 1);
-        Update();
     }
 
     void swap(my_vector<T>& other)  {
@@ -648,9 +771,12 @@ public:
     void resize(size_type count) {
         resize(count, T());
     }
+
 };
 
 // Non-member functions
+
+
 
 template<class T>
 bool operator==(const my_vector<T>& lhs,
