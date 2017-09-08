@@ -5,7 +5,6 @@
 #include <limits>
 #include <iostream>
 #include <stdexcept>
-#include <time.h>
 
 
 template <typename T>
@@ -16,6 +15,7 @@ private:
     using reference = value_type&;
     using const_reference =  const value_type&;
     using difference_type = long;
+
     static size_type Random(size_type lower, size_type upper) {
         static std::random_device randomDevice;
         static std::mt19937 randomGenerator(randomDevice());
@@ -254,6 +254,7 @@ public:
     void assign(size_type count, const T& value) {
         clear();
         while (count) {
+            --count;
             push_back(value);
         }
     }
@@ -279,7 +280,7 @@ public:
             return this[pos];
     }
 
-    const_reference at(size_type pos) const{
+    const_reference at(size_type pos) const {
         if (!(pos < tree_size)) {
             // something bad
         } else
@@ -591,7 +592,7 @@ public:
         }
 
         bool operator < (iterator b) {
-            return (*this - b) > 0;
+            return (b - *this) > 0;
         }
 
         bool operator > (iterator b) {
@@ -611,7 +612,6 @@ public:
             return temp += n;
         }
     };
-
 
     iterator begin() {
         return iterator(TreeMinimum(root), this);
@@ -775,8 +775,6 @@ public:
 };
 
 // Non-member functions
-
-
 
 template<class T>
 bool operator==(const my_vector<T>& lhs,
