@@ -6,7 +6,6 @@
 #include <iostream>
 #include <stdexcept>
 
-
 template <typename T>
 class my_vector {
 private:
@@ -221,9 +220,10 @@ public:
     }
 
     my_vector(my_vector<T>&& other) {
-        for (auto i : other) {
-            push_back(std::move(i));
-        }
+        this->root = other.root;
+        this->tree_size = other.tree_size;
+        this->tree_end = other.tree_end;
+        other.clear();
     }
 
     template<typename InputIt>
@@ -275,14 +275,14 @@ public:
 
     reference at(size_type pos) {
         if (!(pos < tree_size)) {
-            //something bad
+            return nullptr;
         } else
             return this[pos];
     }
 
     const_reference at(size_type pos) const {
         if (!(pos < tree_size)) {
-            // something bad
+            return nullptr;
         } else
             return this[pos];
     }
@@ -799,10 +799,12 @@ template<class T>
 bool operator<(const my_vector<T>& lhs,
                const my_vector<T>& rhs) {
     std::size_t i = 0;
-    for (; i < lhs.size() && i < rhs.size(); ++i) {
-        if (lhs[i] < rhs[i])
+    auto lbegin = lhs.begin();
+    auto rbegin = rhs.begin();
+    for (;lbegin != lhs.end() && rbegin != rhs.end(); ++lbegin, ++rbegin){
+        if (*lbegin < *rbegin)
             return true;
-        if (rhs[i] < lhs[i])
+        if (*rbegin < *lbegin)
             return false;
     }
     if (lhs.size() >= rhs.size())
@@ -813,7 +815,7 @@ bool operator<(const my_vector<T>& lhs,
 template<class T>
 bool operator<=(const my_vector<T>& lhs,
                 const my_vector<T>& rhs) {
-    if (lhs < rhs || lhs == rhs)
+    if (!(rhs < lhs))
         return true;
 }
 
@@ -827,7 +829,7 @@ bool operator>(const my_vector<T>& lhs,
 template<class T>
 bool operator>=(const my_vector<T>& lhs,
                 const my_vector<T>& rhs) {
-    if (rhs < lhs || rhs == lhs)
+    if (!(lhs < rhs))
         return true;
     return false;
 }
